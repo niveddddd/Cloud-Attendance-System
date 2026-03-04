@@ -6,62 +6,156 @@ import qrcode
 import os
 
 app = Flask(__name__)
-[span_3](start_span)[span_4](start_span)app.secret_key = "supersecretkey" #[span_3](end_span)[span_4](end_span)
-[span_5](start_span)DATABASE = "attendance.db" #[span_5](end_span)
+app.secret_key = "supersecretkey"
+DATABASE = "attendance.db"
 
 # ---------------------------------------------------------
-# 1. DATABASE INITIALIZATION
+# DATABASE INITIALIZATION
 # ---------------------------------------------------------
 def init_db():
-    [span_6](start_span)[span_7](start_span)conn = sqlite3.connect(DATABASE) #[span_6](end_span)[span_7](end_span)
-    [span_8](start_span)[span_9](start_span)c = conn.cursor() #[span_8](end_span)[span_9](end_span)
-    
-    # Users table: Stores admin and student credentials
+    conn = sqlite3.connect(DATABASE)
+    c = conn.cursor()
     c.execute("""CREATE TABLE IF NOT EXISTS users (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         username TEXT UNIQUE,
         password TEXT,
-        [span_10](start_span)[span_11](start_span)role TEXT)""") #[span_10](end_span)[span_11](end_span)
-    
-    # Attendance table: Stores daily records
+        role TEXT)""")
     c.execute("""CREATE TABLE IF NOT EXISTS attendance (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         username TEXT,
-        [span_12](start_span)date TEXT)""") #[span_12](end_span)
-    
-    # Ensure default Admin exists (Username: admin | Password: 1234)
-    [span_13](start_span)c.execute("DELETE FROM users WHERE username='admin'") #[span_13](end_span)
+        date TEXT)""")
+    # Default Admin (Username: admin | Password: 1234)
+    c.execute("DELETE FROM users WHERE username='admin'")
     c.execute("INSERT INTO users (username, password, role) VALUES (?, ?, ?)",
-              ("admin", "1234", "admin")[span_14](start_span)) #[span_14](end_span)
-    
-    [span_15](start_span)conn.commit() #[span_15](end_span)
-    [span_16](start_span)[span_17](start_span)conn.close() #[span_16](end_span)[span_17](end_span)
+              ("admin", "1234", "admin"))
+    conn.commit()
+    conn.close()
 
 init_db()
 
 # ---------------------------------------------------------
-# 2. AUTHENTICATION (LOGIN/LOGOUT)
+# AUTHENTICATION
 # ---------------------------------------------------------
-[span_18](start_span)@app.route("/", methods=["GET", "POST"]) #[span_18](end_span)
-[span_19](start_span)@app.route("/login", methods=["GET", "POST"]) #[span_19](end_span)
+@app.route("/", methods=["GET", "POST"])
+@app.route("/login", methods=["GET", "POST"])
 def login():
-    [span_20](start_span)if request.method == "POST": #[span_20](end_span)
-        [span_21](start_span)username = request.form["username"] #[span_21](end_span)
-        [span_22](start_span)password = request.form["password"] #[span_22](end_span)
-        
-        [span_23](start_span)conn = sqlite3.connect(DATABASE); c = conn.cursor() #[span_23](end_span)
-        [span_24](start_span)c.execute("SELECT role FROM users WHERE username=? AND password=?", (username, password)) #[span_24](end_span)
-        [span_25](start_span)user = c.fetchone(); conn.close() #[span_25](end_span)
-        
+    if request.method == "POST":
+        username = request.form["username"]
+        password = request.form["password"]
+        conn = sqlite3.connect(DATABASE); c = conn.cursor()
+        c.execute("SELECT role FROM users WHERE username=? AND password=?", (username, password))
+        user = c.fetchone(); conn.close()
         if user:
-            [span_26](start_span)session["username"] = username #[span_26](end_span)
-            [span_27](start_span)session["role"] = user[0] #[span_27](end_span)
-            [span_28](start_span)if user[0] == "admin": #[span_28](end_span)
-                [span_29](start_span)return redirect("/admin-dashboard") #[span_29](end_span)
-            else:
-                [span_30](start_span)return redirect("/student-dashboard") #[span_30](end_span)
-        [span_31](start_span)return "Invalid Login" #[span_31](end_span)
-    [span_32](start_span)return render_template("login.html") #[span_32](end_span)
+            session["username"], session["role"] = username, user[0]
+            return redirect("/admin-dashboard" if user[0] == "admin" else "/student-dashboard")
+        return "Invalid Login"
+    return render_template("login.html")
+
+@app.route("/logout")
+def logout():
+    session.clear()
+    return redirect("/login")
+
+# ---------------------------------------------------------
+# ADMIN CONTROLS
+# ---------------------------------------------------------
+@app.route("/admin-dashboard")
+def admin_dashboard():
+    if session.get("role") != "admin": return redirect("/login")
+    conn = sqlite3.connect(DATABASE); c = conn.cursor()
+    c.execute("SELECT username, date FROM attendance")
+    data = c.fetchall(); conn.close()
+    return render_template("admin_dashboard.html", attendance=data)
+
+@app.route("/register", methods=["GET", "POST"])
+def register():
+    if session.get("role") != "admin": return redirect("/login")
+    if request.method == "POST":
+        un, pw = request.form["username"], request.form["password"]
+        conn = sqlite3.connect(DATABASE); c = conn.cursor()
+        try:
+            c.execute("INSERT INTO users (username, password, role) VALUES (?, ?, 'student')", (un, pw))
+            conn.commit()
+        except: return "User already exists"
+        finally: conn.close()
+        return redirect("/admin-dashboard")
+    return render_template("register.html")
+
+@app.route("/delete-student/<username>")
+def delete_student(username):
+    if session.get("role") != "admin": return redirect("/login")
+    conn = sqlite3.connect(DATABASE); c = conn.cursor()
+    c.execute("DELETE FROM users WHERE username=?", (username,))
+    c.execute("DELETE FROM attendance WHERE username=?", (username,))
+    conn.commit(); conn.close()
+    return redirect("/admin-dashboard")
+
+@app.route("/admin-mark", methods=["POST"])
+def admin_mark():
+    if session.get("role") != "admin": return redirect("/login")
+    un, dt = request.form["username"], request.form["date"]
+    conn = sqlite3.connect(DATABASE); c = conn.cursor()
+    c.execute("INSERT INTO attendance (username, date) VALUES (?, ?)", (un, dt))
+    conn.commit(); conn.close()
+    return redirect("/admin-dashboard")
+
+# ---------------------------------------------------------
+# QR CODE FEATURE
+# ---------------------------------------------------------
+@app.route("/generate-qr/<class_name>")
+def generate_qr(class_name):
+    if session.get("role") != "admin": return redirect("/login")
+    if not os.path.exists('static'): os.makedirs('static')
+    # Change '127.0.0.1' to your Cloud URL when deploying
+    qr_data = f"http://127.0.0.1:5000/qr-mark/{class_name}"
+    img = qrcode.make(qr_data)
+    img.save("static/qr_code.png")
+    return render_template("qr_display.html", class_name=class_name)
+
+@app.route("/qr-mark/<class_name>")
+def qr_mark(class_name):
+    if "username" not in session: return redirect("/login")
+    un, today = session["username"], datetime.now().strftime("%Y-%m-%d")
+    conn = sqlite3.connect(DATABASE); c = conn.cursor()
+    c.execute("SELECT * FROM attendance WHERE username=? AND date=?", (un, today))
+    if c.fetchone():
+        conn.close(); return "Already marked today!"
+    c.execute("INSERT INTO attendance (username, date) VALUES (?, ?)", (un, today))
+    conn.commit(); conn.close()
+    return f"Attendance for {class_name} Marked Successfully via QR!"
+
+# ---------------------------------------------------------
+# STUDENT & EXCEL EXPORT
+# ---------------------------------------------------------
+@app.route("/student-dashboard")
+def student_dashboard():
+    if session.get("role") != "student": return redirect("/login")
+    return render_template("student_dashboard.html")
+
+@app.route("/mark")
+def mark():
+    if "username" not in session: return redirect("/login")
+    un, today = session["username"], datetime.now().strftime("%Y-%m-%d")
+    conn = sqlite3.connect(DATABASE); c = conn.cursor()
+    c.execute("SELECT * FROM attendance WHERE username=? AND date=?", (un, today))
+    if c.fetchone():
+        conn.close(); return "Already marked today!"
+    c.execute("INSERT INTO attendance (username, date) VALUES (?, ?)", (un, today))
+    conn.commit(); conn.close()
+    return "Marked Successfully!"
+
+@app.route("/export")
+def export():
+    if session.get("role") != "admin": return redirect("/login")
+    conn = sqlite3.connect(DATABASE); c = conn.cursor()
+    c.execute("SELECT username, date FROM attendance"); data = c.fetchall(); conn.close()
+    wb = Workbook(); ws = wb.active; ws.append(["Student Name", "Date"])
+    for row in data: ws.append(row)
+    wb.save("attendance.xlsx")
+    return send_file("attendance.xlsx", as_attachment=True)
+
+if __name__ == "__main__":
+    app.run(debug=True)
 
 [span_33](start_span)@app.route("/logout") #[span_33](end_span)
 def logout():
