@@ -41,3 +41,7 @@ This system allows administrators to manage student records, generate QR codes f
 git clone <your-repo-url>
 cd Cloud-Attendance-System​Set Build Command: pip install -r requirements.txt.
 ​Set Start Command: gunicorn app:app
+```
+install dependencies
+```bash
+pip install flask openpyxl qrcode pillow gunicorn
