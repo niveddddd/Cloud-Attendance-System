@@ -45,3 +45,13 @@ cd Cloud-Attendance-System​Set Build Command: pip install -r requirements.txt.
 install dependencies
 ```bash
 pip install flask openpyxl qrcode pillow gunicorn
+```
+Run the application 
+```bash
+python app.py
+```
+Access the portal:
+```bash
+http://127.0.0.1:5000/
+
+
