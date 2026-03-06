@@ -1,7 +1,149 @@
-/* Professional Dashboard Styling */
-body { font-family: 'Segoe UI', sans-serif; background-color: #f8f9fa; }
-.sidebar { width: 250px; min-height: 100vh; background: #212529; color: white; position: fixed; }
-.main-content { margin-left: 250px; padding: 30px; }
-.card { border: none; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
-.nav-link { color: #adb5bd; }
-.nav-link:hover, .nav-link.active { color: white; background: #343a40; }
+/* --- 1. Global Variables & Base Styles --- */
+:root {
+    --bg-pastel: linear-gradient(135deg, #e0f2fe 0%, #fce7f3 100%);
+    --sidebar-bg: #ffffff; /* Clean white sidebar for pastel look */
+    --primary-blue: #bae6fd;
+    --primary-hover: #7dd3fc;
+    --text-dark: #334155;
+    --text-muted: #64748b;
+    --card-shadow: 0 10px 25px rgba(0, 0, 0, 0.05);
+}
+
+body {
+    font-family: 'Segoe UI', 'Poppins', sans-serif;
+    color: var(--text-dark);
+    margin: 0;
+    background-color: #f8fafc; /* Subtle off-white for dashboard */
+}
+
+/* --- 2. Login Page Specific (Full Pastel) --- */
+.login-body {
+    background: var(--bg-pastel);
+    height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+}
+
+.login-card {
+    border-radius: 24px;
+    background: rgba(255, 255, 255, 0.9);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    box-shadow: var(--card-shadow);
+    width: 100%;
+    max-width: 400px;
+    animation: fadeInUp 0.8s ease-out forwards;
+}
+
+.login-icon {
+    font-size: 50px;
+    display: inline-block;
+    animation: float 3s ease-in-out infinite;
+}
+
+/* --- 3. Dashboard Layout (Professional Sidebar) --- */
+.sidebar {
+    width: 250px;
+    min-height: 100vh;
+    background: var(--sidebar-bg);
+    color: var(--text-dark);
+    position: fixed;
+    border-right: 2px solid #f1f5f9;
+    padding-top: 20px;
+    z-index: 1000;
+}
+
+.main-content {
+    margin-left: 250px;
+    padding: 30px;
+    transition: all 0.3s;
+}
+
+/* Sidebar Nav Links */
+.nav-link {
+    color: var(--text-muted);
+    padding: 12px 20px;
+    border-radius: 10px;
+    margin: 4px 15px;
+    font-weight: 500;
+    transition: all 0.2s;
+}
+
+.nav-link:hover, .nav-link.active {
+    color: #0369a1;
+    background-color: #f0f9ff;
+}
+
+/* Dashboard Cards */
+.card {
+    border: none;
+    border-radius: 15px;
+    box-shadow: var(--card-shadow);
+    background: white;
+}
+
+/* --- 4. Reusable Pastel Components --- */
+.form-control-pastel {
+    background-color: #f8fafc;
+    border: 2px solid #f1f5f9;
+    border-radius: 14px;
+    padding: 12px 18px;
+    transition: all 0.3s ease;
+}
+
+.form-control-pastel:focus {
+    background-color: #ffffff;
+    border-color: var(--primary-blue);
+    box-shadow: 0 0 0 4px rgba(186, 230, 253, 0.25);
+    outline: none;
+}
+
+.btn-pastel {
+    background-color: var(--primary-blue);
+    border: none;
+    color: #0369a1;
+    font-weight: 600;
+    border-radius: 14px;
+    padding: 12px;
+    transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.btn-pastel:hover {
+    background-color: var(--primary-hover);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 15px rgba(125, 211, 252, 0.3);
+}
+
+/* --- 5. Password Toggle UI --- */
+.position-relative { position: relative; }
+.password-toggle {
+    position: absolute;
+    right: 18px;
+    top: 50%;
+    transform: translateY(-50%);
+    cursor: pointer;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--text-muted);
+    user-select: none;
+}
+
+/* --- 6. Animations --- */
+@keyframes fadeInUp {
+    from { opacity: 0; transform: translateY(30px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes float {
+    0% { transform: translateY(0px); }
+    50% { transform: translateY(-10px); }
+    100% { transform: translateY(0px); }
+}
+
+/* --- 7. Mobile Adjustments --- */
+@media (max-width: 768px) {
+    .sidebar { width: 100%; height: auto; position: relative; min-height: auto; }
+    .main-content { margin-left: 0; }
+}
