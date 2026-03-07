@@ -7,33 +7,26 @@ import os
 
 app = Flask(__name__)
 app.secret_key = "supersecretkey"
-
-# --- RENDER PERSISTENT STORAGE CONFIG ---
-# If running on Render, use the /data folder. Otherwise, use local folder.
-if os.path.exists('/data'):
-    DATABASE = "/data/attendance.db"
-else:
-    DATABASE = "attendance.db"
+DATABASE = "attendance.db"
 
 # ---------------------------------------------------------
-# 1. DATABASE INITIALIZATION
+# DATABASE INITIALIZATION
 # ---------------------------------------------------------
 def init_db():
-    # Ensure static folder exists for QR codes
-    if not os.path.exists('static'):
-        os.makedirs('static')
-
     conn = sqlite3.connect(DATABASE)
     c = conn.cursor()
     c.execute("""CREATE TABLE IF NOT EXISTS users (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
-        username TEXT UNIQUE, password TEXT, role TEXT)""")
+        username TEXT UNIQUE,
+        password TEXT,
+        role TEXT)""")
     c.execute("""CREATE TABLE IF NOT EXISTS attendance (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
-        username TEXT, date TEXT)""")
-    
+        username TEXT,
+        date TEXT)""")
     # Default Admin (Username: admin | Password: 1234)
-    c.execute("INSERT OR IGNORE INTO users (username, password, role) VALUES (?, ?, ?)",
+    c.execute("DELETE FROM users WHERE username='admin'")
+    c.execute("INSERT INTO users (username, password, role) VALUES (?, ?, ?)",
               ("admin", "1234", "admin"))
     conn.commit()
     conn.close()
@@ -41,18 +34,19 @@ def init_db():
 init_db()
 
 # ---------------------------------------------------------
-# 2. AUTHENTICATION
+# AUTHENTICATION
 # ---------------------------------------------------------
 @app.route("/", methods=["GET", "POST"])
 @app.route("/login", methods=["GET", "POST"])
 def login():
     if request.method == "POST":
-        un, pw = request.form["username"], request.form["password"]
+        username = request.form["username"]
+        password = request.form["password"]
         conn = sqlite3.connect(DATABASE); c = conn.cursor()
-        c.execute("SELECT role FROM users WHERE username=? AND password=?", (un, pw))
+        c.execute("SELECT role FROM users WHERE username=? AND password=?", (username, password))
         user = c.fetchone(); conn.close()
         if user:
-            session["username"], session["role"] = un, user[0]
+            session["username"], session["role"] = username, user[0]
             return redirect("/admin-dashboard" if user[0] == "admin" else "/student-dashboard")
         return "Invalid Login"
     return render_template("login.html")
@@ -63,7 +57,7 @@ def logout():
     return redirect("/login")
 
 # ---------------------------------------------------------
-# 3. ADMIN CONTROLS
+# ADMIN CONTROLS
 # ---------------------------------------------------------
 @app.route("/admin-dashboard")
 def admin_dashboard():
@@ -96,18 +90,25 @@ def delete_student(username):
     conn.commit(); conn.close()
     return redirect("/admin-dashboard")
 
+@app.route("/admin-mark", methods=["POST"])
+def admin_mark():
+    if session.get("role") != "admin": return redirect("/login")
+    un, dt = request.form["username"], request.form["date"]
+    conn = sqlite3.connect(DATABASE); c = conn.cursor()
+    c.execute("INSERT INTO attendance (username, date) VALUES (?, ?)", (un, dt))
+    conn.commit(); conn.close()
+    return redirect("/admin-dashboard")
+
 # ---------------------------------------------------------
-# 4. QR CODE (UPDATE URL AFTER DEPLOYMENT)
+# QR CODE FEATURE
 # ---------------------------------------------------------
 @app.route("/generate-qr/<class_name>")
 def generate_qr(class_name):
     if session.get("role") != "admin": return redirect("/login")
-    
-    # REPLACEME: Change this to your actual Render URL after deploying
-    # Example: https://cloud-attendance-nived.onrender.com/qr-mark/{class_name}
-    live_url = f"https://your-app-name.onrender.com/qr-mark/{class_name}"
-    
-    img = qrcode.make(live_url)
+    if not os.path.exists('static'): os.makedirs('static')
+    # Use Local IP instead of 127.0.0.1 for mobile scanning
+    qr_data = f"http://127.0.0.1:5000/qr-mark/{class_name}"
+    img = qrcode.make(qr_data)
     img.save("static/qr_code.png")
     return render_template("qr_display.html", class_name=class_name)
 
@@ -124,7 +125,7 @@ def qr_mark(class_name):
     return f"Attendance for {class_name} Marked!"
 
 # ---------------------------------------------------------
-# 5. STUDENT & EXPORT
+# STUDENT & EXPORT
 # ---------------------------------------------------------
 @app.route("/student-dashboard")
 def student_dashboard():
